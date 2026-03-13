@@ -1151,7 +1151,7 @@ select.form-control { cursor: pointer; }
 [data-theme="light"] .sidebar-footer { border-top-color: rgba(255,255,255,.07); }
 [data-theme="light"] .user-name { color: #e2e8f0; }
 [data-theme="light"] .user-role { color: #6b7fa3; }
-[data-theme="light"] .brand-name {color: #f9f9f9;}
+[data-theme="light"] .brand-name {color: #121010;}
 [data-theme="light"] .brand-tagline { color: #6b7fa3; }
 [data-theme="light"] .logout-btn { color: #6b7fa3; }
 [data-theme="light"] .logout-btn:hover { color: #f87171; background: rgba(248,113,113,.1); }
