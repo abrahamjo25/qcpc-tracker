@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+<title>@(ViewData["Title"] != null ? $"{ViewData["Title"]} — QCPC" : "QCPC Issue Tracker")</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<link rel="stylesheet" href="~/css/site.css" />
+<script>
+// Apply saved theme before page renders to avoid flash
+(function(){
+    var t = localStorage.getItem('qcpc-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+</head>
+<body>
+
+@if (User.Identity?.IsAuthenticated == true)
+{
+    var unread = ViewBag.UnreadCount as int? ?? 0;
+    @* ── Authenticated: Full Sidebar Layout ─────────────────────── *@
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-mark">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                    <path d="M11 2L3 6V11C3 15.418 6.582 19.418 11 20C15.418 19.418 19 15.418 19 11V6L11 2Z" fill="currentColor" opacity=".9"/>
+                    <path d="M8 11L10 13L14 9" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div>
+                <div class="brand-name" style="color: white;">QCPC</div>
+                <div class="brand-tagline">Issue Tracker</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-group-label">Overview</div>
+            <a href="/" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Home"?"active":"")">
+                <i class="bi bi-grid-1x2"></i><span>Dashboard</span>
+            </a>
+            <a href="/Issues" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Issues"&&ViewContext.RouteData.Values["action"]?.ToString()=="Index"?"active":"")">
+                <i class="bi bi-bug"></i><span>All Issues</span>
+            </a>
+            <a href="/Issues/Create" class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString()=="Create"?"active":"")">
+                <i class="bi bi-plus-circle"></i><span>Report Issue</span>
+            </a>
+            <a href="/Issues/Reports" class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString()=="Reports"?"active":"")">
+                <i class="bi bi-file-earmark-spreadsheet"></i><span>Reports</span>
+            </a>
+
+            <div class="nav-group-label" style="margin-top:24px">My Work</div>
+            <a href="/Issues/MyIssues" class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString()=="MyIssues"?"active":"")">
+                <i class="bi bi-person-check"></i><span>My Issues</span>
+            </a>
+            <a href="/Issues/Notifications" class="nav-link @(ViewContext.RouteData.Values["action"]?.ToString()=="Notifications"?"active":"")">
+                <i class="bi bi-bell"></i><span>Notifications</span>
+                @if (unread > 0) { <span class="nav-badge">@unread</span> }
+            </a>
+
+            @if (User.IsInRole("Admin") || User.IsInRole("QualityManager"))
+            {
+                <div class="nav-group-label" style="margin-top:24px">Admin</div>
+                <a href="/Admin/Users" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Admin"?"active":"")">
+                    <i class="bi bi-people"></i><span>Users</span>
+                </a>
+                <a href="/Departments" class="nav-link @(ViewContext.RouteData.Values["controller"]?.ToString()=="Departments"?"active":"")">
+                    <i class="bi bi-building"></i><span>Departments</span>
+                </a>
+            }
+        </nav>
+
+        <div class="sidebar-footer">
+            <a href="/Account/Manage" class="user-pill" style="text-decoration:none;color:inherit;cursor:pointer">
+                <div class="user-av">@(User.Identity?.Name?.Substring(0,1).ToUpper())</div>
+                <div class="user-info">
+                    <div class="user-name">@User.Identity?.Name?.Split('@')[0]</div>
+                    <div class="user-role">@(User.IsInRole("Admin")?"Administrator":User.IsInRole("QualityManager")?"QA Manager":User.IsInRole("TeamLead")?"Team Lead":"Developer")</div>
+                </div>
+            </a>
+            <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+                <i class="bi bi-sun" id="themeIcon"></i>
+            </button>
+            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="logout-btn" title="Sign out">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="main-wrap">
+        <header class="topbar">
+            <button class="hamburger" id="hamburger"><i class="bi bi-list"></i></button>
+            <form action="/Issues" method="get" class="topbar-search">
+                <i class="bi bi-search"></i>
+                <input name="Search" placeholder="Search issues, tags…" value="@Context.Request.Query["Search"]" autocomplete="off" />
+            </form>
+            <div class="topbar-right">
+                <a href="/Issues/Notifications" class="topbar-icon">
+                    <i class="bi bi-bell"></i>
+                    @if (unread > 0) { <span class="topbar-badge">@unread</span> }
+                </a>
+                <a href="/Issues/Create" class="btn-new-issue">
+                    <i class="bi bi-plus-lg"></i><span>New Issue</span>
+                </a>
+            </div>
+        </header>
+        <main class="page-content">
+            @if (TempData["Success"] is string s && !string.IsNullOrEmpty(s))
+            { <div class="toast-alert toast-success"><i class="bi bi-check-circle-fill"></i> @s</div> }
+            @if (TempData["Error"] is string e2 && !string.IsNullOrEmpty(e2))
+            { <div class="toast-alert toast-error"><i class="bi bi-exclamation-circle-fill"></i> @e2</div> }
+            @RenderBody()
+        </main>
+    </div>
+}
+else
+{
+    @* ── Guest: Slim public header ──────────────────────────────── *@
+    <div class="guest-wrap">
+        <header class="guest-topbar">
+            <a href="/Issues" class="guest-brand">
+                <div class="brand-mark" style="width:30px;height:30px;border-radius:8px">
+                    <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
+                        <path d="M11 2L3 6V11C3 15.418 6.582 19.418 11 20C15.418 19.418 19 15.418 19 11V6L11 2Z" fill="currentColor" opacity=".9"/>
+                        <path d="M8 11L10 13L14 9" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <span class="brand-name">QCPC</span>
+            </a>
+            <nav style="display:flex;align-items:center;gap:6px">
+                <a href="/Issues" class="guest-nav-link">
+                    <i class="bi bi-bug"></i> Browse Issues
+                </a>
+                <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+                    <i class="bi bi-sun" id="themeIcon"></i>
+                </button>
+                <a href="/Account/Login" class="btn btn-ghost btn-sm">Sign In</a>
+                <a href="/Account/Register" class="btn btn-primary btn-sm">Register</a>
+            </nav>
+        </header>
+
+        <div class="guest-banner">
+            <i class="bi bi-eye"></i>
+            <span>You're viewing as a <strong>guest</strong>. <a href="/Account/Login">Sign in</a> or <a href="/Account/Register">register</a> to report issues, post answers, and collaborate.</span>
+        </div>
+
+        <main class="page-content" style="max-width:1200px;margin:0 auto">
+            @if (TempData["Success"] is string s2 && !string.IsNullOrEmpty(s2))
+            { <div class="toast-alert toast-success"><i class="bi bi-check-circle-fill"></i> @s2</div> }
+            @RenderBody()
+        </main>
+    </div>
+}
+
+<script>
+// ── Sidebar toggle ───────────────────────────────────────────
+const ham = document.getElementById('hamburger');
+const bar = document.getElementById('sidebar');
+if(ham && bar){
+    ham.onclick = () => { bar.classList.toggle('open'); document.body.classList.toggle('sb-open'); };
+    document.addEventListener('click', e => {
+        if(!bar.contains(e.target) && !ham.contains(e.target) && bar.classList.contains('open')){
+            bar.classList.remove('open'); document.body.classList.remove('sb-open');
+        }
+    });
+}
+
+// ── Theme toggle ─────────────────────────────────────────────
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('qcpc-theme', theme);
+    var icon = document.getElementById('themeIcon');
+    if (icon) icon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+}
+
+var toggleBtn = document.getElementById('themeToggle');
+if (toggleBtn) {
+    var curTheme = localStorage.getItem('qcpc-theme') || 'light';
+    applyTheme(curTheme);
+    toggleBtn.onclick = function() {
+        var t = document.documentElement.getAttribute('data-theme');
+        applyTheme(t === 'dark' ? 'light' : 'dark');
+    };
+}
+
+// ── Auth prompt modal ────────────────────────────────────────
+// Shown when a guest tries to interact with action elements
+function showAuthPrompt(returnUrl) {
+    var modal = document.getElementById('authPromptModal');
+    if (!modal) return;
+    var loginLink = modal.querySelector('#authLoginLink');
+    var regLink   = modal.querySelector('#authRegLink');
+    var url = returnUrl || window.location.pathname;
+    if (loginLink) loginLink.href = '/Account/Login?returnUrl=' + encodeURIComponent(url);
+    if (regLink)   regLink.href   = '/Account/Register';
+    modal.classList.add('show');
+}
+
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-auth-required]');
+    if (btn) {
+        e.preventDefault();
+        showAuthPrompt(btn.getAttribute('data-auth-required') || window.location.pathname);
+    }
+    if (e.target.closest('[data-modal-close]')) {
+        document.querySelectorAll('.auth-modal').forEach(m => m.classList.remove('show'));
+    }
+    if (e.target.classList.contains('auth-modal')) {
+        e.target.classList.remove('show');
+    }
+});
+
+// ── Toast auto-hide ──────────────────────────────────────────
+setTimeout(() => {
+    document.querySelectorAll('.toast-alert').forEach(t => {
+        t.style.transition='opacity .5s'; t.style.opacity='0';
+        setTimeout(()=>t.remove(), 500);
+    });
+}, 3500);
+</script>
+
+@* Auth prompt modal (only needed for guests) *@
+@if (User.Identity?.IsAuthenticated != true)
+{
+    <div class="auth-modal" id="authPromptModal">
+        <div class="auth-modal-box">
+            <button class="auth-modal-close" data-modal-close>
+                <i class="bi bi-x-lg"></i>
+            </button>
+            <div class="auth-logo" style="width:44px;height:44px;border-radius:12px;margin-bottom:16px">
+                <i class="bi bi-lock" style="font-size:18px"></i>
+            </div>
+            <h2 style="font-family:sans-serif;font-size:18px;font-weight:800;margin-bottom:6px;color:var(--tx-1)">
+                Sign in to continue
+            </h2>
+            <p style="font-size:13px;color:var(--tx-3);margin-bottom:22px;line-height:1.6">
+                You need an Ethiopian Airlines account to post answers, comments, and report issues.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                <a id="authLoginLink" href="/Account/Login" class="btn btn-primary" style="justify-content:center;padding:10px">
+                    <i class="bi bi-box-arrow-in-right"></i> Sign In
+                </a>
+                <a id="authRegLink" href="/Account/Register" class="btn btn-ghost" style="justify-content:center">
+                    <i class="bi bi-person-plus"></i> Create Account
+                </a>
+            </div>
+            <p style="font-size:11.5px;color:var(--tx-3);text-align:center;margin-top:14px">
+                Only <strong>@@ethiopianairlines.com</strong> emails are accepted.
+            </p>
+        </div>
+    </div>
+}
+
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

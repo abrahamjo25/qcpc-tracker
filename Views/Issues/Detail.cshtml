@@ -1,0 +1,548 @@
+@model QCPCMvc.ViewModels.IssueDetailVm
+@using QCPCMvc.Models
+@using System.Security.Claims
+@{ ViewData["Title"] = Model.Issue.Title; var uid = User.FindFirstValue(ClaimTypes.NameIdentifier); }
+
+<div class="page-header">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <a href="/Issues" class="btn btn-ghost btn-sm"><i class="bi bi-arrow-left"></i></a>
+        <span class="issue-num" style="font-size:13px">#@Model.Issue.ResponseNumber</span>
+        @Html.Raw(StatusBadge(Model.Issue.Status))
+        @Html.Raw(PriorityBadge(Model.Issue.Priority))
+        <span class="badge badge-closed">@Model.Issue.Type</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        @if (Model.Issue.SubmittedById == uid || User.IsInRole("Admin") || User.IsInRole("QualityManager"))
+        {
+            <a href="/Issues/Edit/@Model.Issue.Id" class="btn btn-ghost btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+        }
+    </div>
+</div>
+
+<div class="detail-grid">
+
+    @* ── Main Column ───────────────────────────────────────────── *@
+    <div>
+        @* Issue Body *@
+        <div class="card mb-16">
+            <div class="card-body">
+                <h1 class="issue-detail-title">@Model.Issue.Title</h1>
+
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12.5px;color:var(--tx-3)">
+                    <span><i class="bi bi-person" style="margin-right:4px"></i>@Model.Issue.SubmittedBy?.FullName</span>
+                    <span><i class="bi bi-calendar" style="margin-right:4px"></i>@Model.Issue.ReceivedDate.ToString("MMMM dd, yyyy")</span>
+                    <span><i class="bi bi-diagram-3" style="margin-right:4px"></i>@FormatProcess(Model.Issue.Process)</span>
+                    @if (Model.Issue.PromisedDate.HasValue)
+                    {
+                        var ov = Model.Issue.PromisedDate < DateTime.UtcNow && Model.Issue.Status != IssueStatus.Resolved;
+                        <span class="@(ov ? "overdue" : "")">
+                            <i class="bi bi-clock" style="margin-right:4px"></i>
+                            Due @Model.Issue.PromisedDate.Value.ToString("MMM dd, yyyy")
+                            @if (ov) { <strong>(Overdue)</strong> }
+                        </span>
+                    }
+                </div>
+
+                <div class="issue-body">@Html.Raw(RenderMentions(Model.Issue.Description))</div>
+
+                @if (!string.IsNullOrEmpty(Model.Issue.Tags))
+                {
+                    <div class="mt-16">
+                        @foreach (var t in Model.Issue.Tags.Split(','))
+                        { <span class="tag">@t.Trim()</span> }
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Model.Issue.CorrectiveAction))
+                {
+                    <div class="corrective-box">
+                        <div class="corrective-box-label"><i class="bi bi-tools"></i> Corrective Action</div>
+                        <div style="font-size:13.5px;color:var(--tx-1)">@Model.Issue.CorrectiveAction</div>
+                    </div>
+                }
+
+                @* Status change actions *@
+                @if (Model.Issue.SubmittedById == uid || User.IsInRole("Admin") || User.IsInRole("QualityManager") || User.IsInRole("TeamLead"))
+                {
+                    <div class="action-bar">
+                        @foreach (IssueStatus s in Enum.GetValues<IssueStatus>())
+                        {
+                            if (s == Model.Issue.Status) continue;
+                            <form method="post" action="/Issues/ChangeStatus">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@Model.Issue.Id" />
+                                <input type="hidden" name="status" value="@s" />
+                                <button type="submit" class="status-action-btn">
+                                    <i class="bi bi-@StatusIcon(s)"></i> @s
+                                </button>
+                            </form>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Discussion Comments *@
+        <div class="card mb-16">
+            <div class="card-body">
+                <div class="form-section-title">
+                    <i class="bi bi-chat-left-text"></i>
+                    Discussion
+                    <span style="font-weight:400;color:var(--tx-3);margin-left:4px">(@Model.Issue.Comments.Count(c => !c.AnswerId.HasValue) comments)</span>
+                </div>
+
+                @foreach (var c in Model.Issue.Comments.Where(c => !c.AnswerId.HasValue && !c.ParentId.HasValue).OrderBy(c => c.CreatedAt))
+                {
+                    @await Html.PartialAsync("_Comment", c)
+                    @foreach (var r in Model.Issue.Comments.Where(rc => rc.ParentId == c.Id).OrderBy(rc => rc.CreatedAt))
+                    {
+                        <div class="reply-indent">@await Html.PartialAsync("_Comment", r)</div>
+                    }
+                }
+
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <form method="post" action="/Issues/PostComment" class="mt-16">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="issueId" value="@Model.Issue.Id" />
+                        <input type="hidden" name="answerId" value="" />
+                        <input type="hidden" name="parentId" value="" />
+                        <div style="position:relative">
+                            <textarea name="body" class="form-control mention-input" rows="3"
+                                      placeholder="Leave a comment… (type @@name to mention someone)"
+                                      id="issueCommentBox" autocomplete="off"></textarea>
+                            <div class="mention-dropdown" style="display:none"></div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:8px">
+                            <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-send"></i> Comment</button>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <div class="auth-gate-prompt" data-auth-required="/Issues/Detail/@Model.Issue.Id">
+                        <i class="bi bi-lock"></i>
+                        <span><a href="#" data-auth-required="/Issues/Detail/@Model.Issue.Id">Sign in</a> to leave a comment.</span>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Answers *@
+        <div class="card">
+            <div class="card-body">
+                <div class="form-section-title">
+                    <i class="bi bi-chat-square-text"></i>
+                    @Model.Issue.Answers.Count Answer(s)
+                    @if (Model.Issue.Answers.Any(a => a.IsAccepted))
+                    { <span class="badge badge-resolved" style="font-weight:500;margin-left:6px">✓ Answered</span> }
+                </div>
+
+                @foreach (var ans in Model.Issue.Answers.OrderByDescending(a => a.IsAccepted).ThenByDescending(a => a.CreatedAt))
+                {
+                    <div class="answer-block @(ans.IsAccepted ? "accepted" : "")">
+                        @if (ans.IsAccepted)
+                        {
+                            <div class="answer-accepted-badge">
+                                <i class="bi bi-check-circle-fill"></i> Accepted Answer
+                            </div>
+                        }
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+                            <div class="user-chip">
+                                <div class="avatar avatar-md">@ans.Author?.FullName.Substring(0,1)</div>
+                                <div>
+                                    <div style="font-size:13.5px;font-weight:600;color:var(--tx-1)">@ans.Author?.FullName</div>
+                                    <div class="text-xs text-muted">@ans.CreatedAt.ToString("MMM dd, yyyy HH:mm")</div>
+                                </div>
+                            </div>
+                            <div style="margin-left:auto;display:flex;gap:6px">
+                                @if (Model.Issue.SubmittedById == uid && !ans.IsAccepted)
+                                {
+                                    <form method="post" action="/Issues/AcceptAnswer">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="answerId" value="@ans.Id" />
+                                        <input type="hidden" name="issueId" value="@Model.Issue.Id" />
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            <i class="bi bi-check2"></i> Accept
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                        <div class="answer-body">@Html.Raw(RenderMentions(ans.Body))</div>
+
+                        @* Comments on answer *@
+                        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+                            @foreach (var ac in ans.Comments.Where(c => !c.ParentId.HasValue).OrderBy(c => c.CreatedAt))
+                            {
+                                @await Html.PartialAsync("_Comment", ac)
+                                @foreach (var r in ans.Comments.Where(rc => rc.ParentId == ac.Id).OrderBy(rc => rc.CreatedAt))
+                                {
+                                    <div class="reply-indent">@await Html.PartialAsync("_Comment", r)</div>
+                                }
+                            }
+                            <form method="post" action="/Issues/PostComment" class="mt-8">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="issueId" value="@Model.Issue.Id" />
+                                <input type="hidden" name="answerId" value="@ans.Id" />
+                                <input type="hidden" name="parentId" value="" />
+                                <div style="display:flex;gap:8px;position:relative">
+                                    <input type="text" name="body" class="form-control form-control-sm mention-input"
+                                           placeholder="Comment on this answer… (@@name to mention)"
+                                           style="font-size:12.5px;padding:6px 10px"
+                                           autocomplete="off" />
+                                    <div class="mention-dropdown" style="display:none"></div>
+                                    <button type="submit" class="btn btn-ghost btn-xs">
+                                        <i class="bi bi-send"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                }
+
+                @* Post Answer *@
+                <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+                    <div style="font-family:sans-serif;font-size:15px;font-weight:700;margin-bottom:10px;color:var(--tx-1)">
+                        <i class="bi bi-reply"></i> Your Answer
+                    </div>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <p class="text-sm text-muted mb-8">Type @@name to mention a team member.</p>
+                        <form method="post" action="/Issues/PostAnswer">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="issueId" value="@Model.Issue.Id" />
+                            <div style="position:relative">
+                                <textarea name="body" class="form-control mention-input" rows="5"
+                                          placeholder="Write a detailed answer… (type @@name to mention someone)"
+                                          autocomplete="off"></textarea>
+                                <div class="mention-dropdown" style="display:none"></div>
+                            </div>
+                            <div style="margin-top:10px">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send"></i> Post Answer
+                                </button>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="auth-gate-prompt" style="padding:20px 0">
+                            <i class="bi bi-lock" style="font-size:22px;display:block;margin-bottom:10px;opacity:.4"></i>
+                            <p style="font-size:13.5px;color:var(--tx-2);margin-bottom:12px">
+                                You need to be signed in to post an answer.
+                            </p>
+                            <button class="btn btn-primary" data-auth-required="/Issues/Detail/@Model.Issue.Id">
+                                <i class="bi bi-box-arrow-in-right"></i> Sign In to Answer
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ── Right Sidebar ─────────────────────────────────────────── *@
+    <div>
+        @* Details *@
+        <div class="side-panel">
+            <div class="side-panel-header"><i class="bi bi-info-circle"></i> Details</div>
+            <div class="side-panel-body" style="padding:0">
+                @DetailRow("Status",    Html.Raw(StatusBadge(Model.Issue.Status)))
+                @DetailRow("Priority",  Html.Raw(PriorityBadge(Model.Issue.Priority)))
+                @DetailRow("Process",   FormatProcess(Model.Issue.Process))
+                @DetailRow("Team",      Model.Issue.ResponsibleTeam ?? "—")
+                @DetailRow("Q. Group",  $"Group {(int)Model.Issue.QGroup}")
+                @DetailRow("Admitted",  Model.Issue.Admitted ? "✓ Yes" : "No")
+                @DetailRow("Resolved",  Model.Issue.Resolved ? "✓ Yes" : "No")
+                @if (Model.Issue.CompletedDate.HasValue)
+                { @DetailRow("Completed", Model.Issue.CompletedDate.Value.ToString("MMM dd, yyyy")) }
+            </div>
+        </div>
+
+        @* Assignee *@
+        <div class="side-panel">
+            <div class="side-panel-header"><i class="bi bi-person-check"></i> Assignee</div>
+            <div class="side-panel-body">
+                @if (Model.Issue.AssignedTo != null)
+                {
+                    <div class="user-chip mb-16">
+                        <div class="avatar avatar-md">@Model.Issue.AssignedTo.FullName.Substring(0,1)</div>
+                        <div>
+                            <div style="font-weight:600;font-size:13px">@Model.Issue.AssignedTo.FullName</div>
+                            <div class="text-xs text-muted">@Model.Issue.AssignedTo.Department</div>
+                        </div>
+                    </div>
+                }
+                else { <p class="text-sm text-muted mb-8">Unassigned</p> }
+
+                @if (User.IsInRole("Admin") || User.IsInRole("QualityManager") || User.IsInRole("TeamLead"))
+                {
+                    <form method="post" action="/Issues/Assign">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@Model.Issue.Id" />
+                        <select name="assigneeId" class="form-control" style="font-size:12.5px;padding:6px 10px">
+                            <option value="">Unassigned</option>
+                            @foreach (var u in Model.Users)
+                            {
+                                <option value="@u.Id" selected="@(u.Id == Model.Issue.AssignedToId)">
+                                    @u.FullName (@u.Department)
+                                </option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-ghost btn-sm w-full" style="margin-top:8px;justify-content:center">
+                            Update Assignee
+                        </button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        @* Notify for Answer *@
+        <div class="side-panel">
+            <div class="side-panel-header"><i class="bi bi-at"></i> Request Answer</div>
+            <div class="side-panel-body">
+                <p class="text-sm text-muted mb-8">Notify a team member to answer this issue.</p>
+                <form method="post" action="/Issues/MentionUser">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="issueId" value="@Model.Issue.Id" />
+                    <select name="mentionedUserId" class="form-control" style="font-size:12.5px;padding:6px 10px">
+                        <option value="">Select person…</option>
+                        @foreach (var u in Model.Users.Where(u => u.Id != uid))
+                        { <option value="@u.Id">@u.FullName — @u.Department</option> }
+                    </select>
+                    <button type="submit" class="btn btn-ghost btn-sm w-full" style="margin-top:8px;justify-content:center">
+                        <i class="bi bi-bell"></i> Notify & Request
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        @* Activity *@
+        <div class="side-panel">
+            <div class="side-panel-header"><i class="bi bi-clock-history"></i> Activity</div>
+            <div class="side-panel-body" style="padding:10px 16px">
+                @if (!Model.Issue.Activities.Any())
+                { <p class="text-sm text-muted">No activity yet.</p> }
+                else
+                {
+                    @foreach (var a in Model.Issue.Activities.OrderByDescending(x => x.CreatedAt).Take(10))
+                    {
+                        <div class="activity-item">
+                            <div class="activity-dot" style="background:@ActivityColor(a.Type)"></div>
+                            <div>
+                                <div class="activity-text">
+                                    <strong>@a.Actor?.FullName?.Split(' ')[0]</strong>
+                                    @a.Description
+                                </div>
+                                <div class="activity-time">@TimeAgo(a.CreatedAt)</div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    IHtmlContent DetailRow(string label, object value)
+    {
+        return new HtmlString($@"<div class='meta-row' style='padding:9px 16px'>
+            <span class='meta-label'>{label}</span>
+            <span style='text-align:right'>{value}</span>
+        </div>");
+    }
+    string FormatProcess(IssueProcess p) => p switch {
+        IssueProcess.TestingAndQA => "Testing & QA", IssueProcess.OperatingMonitoring => "Operating & Monitoring",
+        IssueProcess.TechnicalDocPrep => "Technical Doc Prep", IssueProcess.CrossFunctional => "Cross Functional", _ => p.ToString()
+    };
+    string StatusBadge(IssueStatus s) => s switch {
+        IssueStatus.Open => "<span class='badge badge-open'>Open</span>",
+        IssueStatus.InProgress => "<span class='badge badge-inprogress'>In Progress</span>",
+        IssueStatus.PendingReview => "<span class='badge badge-pending'>Pending Review</span>",
+        IssueStatus.Resolved => "<span class='badge badge-resolved'>Resolved</span>",
+        IssueStatus.Closed => "<span class='badge badge-closed'>Closed</span>",
+        _ => "<span class='badge badge-rejected'>Rejected</span>"
+    };
+    string PriorityBadge(IssuePriority p) => p switch {
+        IssuePriority.Critical => "<span class='badge badge-critical'>● Critical</span>",
+        IssuePriority.High => "<span class='badge badge-high'>↑ High</span>",
+        IssuePriority.Medium => "<span class='badge badge-medium'>– Medium</span>",
+        IssuePriority.Low => "<span class='badge badge-low'>↓ Low</span>",
+        _ => "<span class='badge badge-minimal'>Minimal</span>"
+    };
+    string StatusIcon(IssueStatus s) => s switch {
+        IssueStatus.Resolved => "check2-circle", IssueStatus.Closed => "x-circle",
+        IssueStatus.InProgress => "arrow-repeat", IssueStatus.Open => "record-circle", _ => "dash-circle"
+    };
+    string ActivityColor(ActivityType t) => t switch {
+        ActivityType.Created => "#4f7cff", ActivityType.Resolved => "#34d399",
+        ActivityType.AnswerAccepted => "#34d399", ActivityType.StatusChanged => "#f5a623",
+        ActivityType.AnswerAdded => "#a78bfa", _ => "#6b7280"
+    };
+    string TimeAgo(DateTime dt) {
+        var d = DateTime.UtcNow - dt;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours   < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays    < 1) return $"{(int)d.TotalHours}h ago";
+        if (d.TotalDays    < 30) return $"{(int)d.TotalDays}d ago";
+        return dt.ToString("MMM dd, yyyy");
+    }
+    string RenderMentions(string? text) {
+        if (string.IsNullOrEmpty(text)) return "";
+        // Strip any accidentally-stored HTML tags
+        var clean = System.Text.RegularExpressions.Regex.Replace(text, @"<[^>]+>", "");
+        var html  = System.Net.WebUtility.HtmlEncode(clean);
+        html = html.Replace("\n", "<br>");
+        return System.Text.RegularExpressions.Regex.Replace(html,
+            @"@([\w][\w.]{0,49})",
+            m => $"<span class='mention-highlight'>@{System.Net.WebUtility.HtmlEncode(m.Groups[1].Value)}</span>");
+    }
+}
+@section Scripts {
+<style>
+.mention-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 240px;
+    max-width: 320px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    overflow: hidden;
+    font-size: 13px;
+}
+.mention-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background .1s;
+    user-select: none;
+}
+.mention-item:hover, .mention-item.active { background: var(--accent-dim); }
+.mention-item .mi-avatar {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg,#4f7cff,#7c3aed);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+}
+.mention-item .mi-name  { font-weight: 600; color: var(--tx-1); line-height: 1.2; }
+.mention-item .mi-dept  { font-size: 11px; color: var(--tx-3); }
+.mention-item .mi-handle{ font-size: 11px; color: var(--accent); }
+.mention-highlight {
+    background: rgba(79,124,255,.15); color: #7ba6ff;
+    border-radius: 3px; padding: 0 3px; font-weight: 600;
+}
+</style>
+<script>
+(function() {
+    var DEBOUNCE = 180;
+
+    function initMentionInput(input) {
+        var dropdown = input.parentElement.querySelector('.mention-dropdown');
+        if (!dropdown || input.dataset.mentionInit) return;
+        input.dataset.mentionInit = '1';
+
+        var timer = null, activeIdx = -1, items = [], currentQuery = '';
+
+        function show() { dropdown.style.display = 'block'; }
+        function hide() { dropdown.style.display = 'none'; activeIdx = -1; }
+
+        function getQuery() {
+            var val = input.value, pos = input.selectionStart || val.length;
+            var m = val.slice(0, pos).match(/@@([\w.]*)$/);
+            return m ? m[1] : null;
+        }
+
+        function insertMention(user) {
+            var val = input.value, pos = input.selectionStart || val.length;
+            var before = val.slice(0, pos), after = val.slice(pos);
+            var replaced = before.replace(/@@([\w.]*)$/, '@@' + user.handle + ' ');
+            input.value = replaced + after;
+            hide(); input.focus();
+            input.setSelectionRange(replaced.length, replaced.length);
+        }
+
+        function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        function render(users) {
+            items = users;
+            if (!users.length) { hide(); return; }
+            dropdown.innerHTML = users.map(function(u,i) {
+                return '<div class="mention-item" data-idx="'+i+'">' +
+                    '<div class="mi-avatar">'+esc(u.initials)+'</div>' +
+                    '<div><div class="mi-name">'+esc(u.name)+'</div>' +
+                    '<div><span class="mi-handle">@@'+esc(u.handle)+'</span>' +
+                    (u.dept ? ' <span class="mi-dept">'+esc(u.dept)+'</span>' : '')+'</div></div></div>';
+            }).join('');
+            show();
+            dropdown.querySelectorAll('.mention-item').forEach(function(el) {
+                el.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    insertMention(items[parseInt(el.dataset.idx)]);
+                });
+            });
+        }
+
+        function setActive(i) {
+            var els = dropdown.querySelectorAll('.mention-item');
+            els.forEach(function(el){ el.classList.remove('active'); });
+            if (i >= 0 && i < els.length) { els[i].classList.add('active'); els[i].scrollIntoView({block:'nearest'}); }
+            activeIdx = i;
+        }
+
+        function fetch_(q) {
+            currentQuery = q;
+            fetch('/Issues/MentionSuggest?q=' + encodeURIComponent(q))
+                .then(function(r){ return r.json(); })
+                .then(function(u){ if (currentQuery === q) render(u); })
+                .catch(function(){ hide(); });
+        }
+
+        input.addEventListener('input', function() {
+            clearTimeout(timer);
+            var q = getQuery();
+            if (q === null) { hide(); return; }
+            timer = setTimeout(function(){ fetch_(q); }, DEBOUNCE);
+        });
+
+        input.addEventListener('keydown', function(e) {
+            if (dropdown.style.display === 'none') return;
+            if (e.key === 'ArrowDown')  { e.preventDefault(); setActive(Math.min(activeIdx+1, items.length-1)); }
+            else if (e.key === 'ArrowUp')  { e.preventDefault(); setActive(Math.max(activeIdx-1, 0)); }
+            else if ((e.key === 'Enter' || e.key === 'Tab') && activeIdx >= 0) { e.preventDefault(); insertMention(items[activeIdx]); }
+            else if (e.key === 'Escape') { hide(); }
+        });
+
+        input.addEventListener('blur', function(){ setTimeout(hide, 150); });
+    }
+
+    // Init all visible mention inputs on load
+    document.querySelectorAll('.mention-input').forEach(initMentionInput);
+
+    // Init reply inputs when reply form shown
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.btn-reply-toggle');
+        if (btn) {
+            var form = btn.nextElementSibling;
+            if (form) {
+                form.style.display = 'block';
+                var inp = form.querySelector('.mention-input');
+                if (inp) { initMentionInput(inp); setTimeout(function(){ inp.focus(); }, 50); }
+            }
+        }
+        var cancel = e.target.closest('.btn-cancel-reply');
+        if (cancel) cancel.closest('.reply-form').style.display = 'none';
+    });
+})();
+</script>
+}

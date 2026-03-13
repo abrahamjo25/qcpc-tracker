@@ -1,0 +1,173 @@
+@model QCPCMvc.ViewModels.DashboardVm
+@using QCPCMvc.Models
+@{ ViewData["Title"] = "Dashboard"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <div class="page-subtitle">Quality Clinic Process Chart — Issue Overview</div>
+    </div>
+</div>
+
+@if (Model.Critical > 0)
+{
+    <div class="toast-alert toast-error" style="margin-bottom:20px">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>@Model.Critical critical</strong> unresolved issue(s) need immediate attention.
+        <a href="/Issues?Priority=Critical" class="btn btn-sm btn-ghost" style="margin-left:auto">View</a>
+    </div>
+}
+
+@* KPI Cards *@
+<div class="kpi-grid">
+    <a href="/Issues" class="kpi-card" style="--kpi-color:#7ba6ff">
+        <div class="kpi-icon"><i class="bi bi-collection"></i></div>
+        <div class="kpi-value">@Model.Total</div>
+        <div class="kpi-label">Total Issues</div>
+    </a>
+    <a href="/Issues?Status=Open" class="kpi-card" style="--kpi-color:#a78bfa">
+        <div class="kpi-icon"><i class="bi bi-record-circle"></i></div>
+        <div class="kpi-value">@Model.Open</div>
+        <div class="kpi-label">Open</div>
+    </a>
+    <a href="/Issues?Status=InProgress" class="kpi-card" style="--kpi-color:#f5a623">
+        <div class="kpi-icon"><i class="bi bi-arrow-repeat"></i></div>
+        <div class="kpi-value">@Model.InProgress</div>
+        <div class="kpi-label">In Progress</div>
+    </a>
+    <a href="/Issues?Status=Resolved" class="kpi-card" style="--kpi-color:#34d399">
+        <div class="kpi-icon"><i class="bi bi-check-circle"></i></div>
+        <div class="kpi-value">@Model.Resolved</div>
+        <div class="kpi-label">Resolved</div>
+    </a>
+</div>
+
+@* Charts *@
+<div class="chart-row">
+    <div class="card">
+        <div class="card-body">
+            <div class="form-section-title"><i class="bi bi-diagram-3"></i> By Process</div>
+            @foreach (var kv in Model.ByProcess.OrderByDescending(x => x.Value))
+            {
+                var pct = Model.Total > 0 ? (double)kv.Value / Model.Total * 100 : 0;
+                <div class="bar-row">
+                    <div class="bar-label">@FormatProcess(kv.Key)</div>
+                    <div class="bar-track"><div class="bar-fill" style="width:@pct.ToString("F0")%"></div></div>
+                    <div class="bar-count">@kv.Value</div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <div class="form-section-title"><i class="bi bi-flag"></i> By Priority</div>
+            @foreach (var kv in Model.ByPriority.OrderBy(x => (int)x.Key))
+            {
+                var pct = Model.Total > 0 ? (double)kv.Value / Model.Total * 100 : 0;
+                var clr = kv.Key switch {
+                    IssuePriority.Critical => "#f87171",
+                    IssuePriority.High     => "#fb923c",
+                    IssuePriority.Medium   => "#facc15",
+                    IssuePriority.Low      => "#34d399",
+                    _                      => "#6b7280"
+                };
+                <div class="bar-row">
+                    <div class="bar-label" style="display:flex;align-items:center;gap:6px">
+                        <span style="width:8px;height:8px;border-radius:50%;background:@clr;flex-shrink:0;display:inline-block"></span>
+                        @kv.Key
+                    </div>
+                    <div class="bar-track"><div class="bar-fill" style="width:@pct.ToString("F0")%;background:@clr"></div></div>
+                    <div class="bar-count">@kv.Value</div>
+                </div>
+            }
+
+            @if (Model.ByTeam.Any())
+            {
+                <div class="form-section-title" style="margin-top:20px"><i class="bi bi-people"></i> By Team</div>
+                @foreach (var kv in Model.ByTeam.OrderByDescending(x => x.Value))
+                {
+                    var pct = Model.Total > 0 ? (double)kv.Value / Model.Total * 100 : 0;
+                    <div class="bar-row">
+                        <div class="bar-label">@kv.Key</div>
+                        <div class="bar-track"><div class="bar-fill" style="width:@pct.ToString("F0")%;background:#a78bfa"></div></div>
+                        <div class="bar-count">@kv.Value</div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@* Recent Issues *@
+<div class="card">
+    <div class="card-body" style="padding-bottom:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div class="form-section-title" style="margin-bottom:0"><i class="bi bi-clock-history"></i> Recent Issues</div>
+            <a href="/Issues" class="btn btn-ghost btn-sm">View All</a>
+        </div>
+    </div>
+    <div style="overflow-x:auto">
+        <table class="issue-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Process</th>
+                    <th>Submitted By</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var i in Model.RecentIssues)
+                {
+                    <tr onclick="location.href='/Issues/Detail/@i.Id'">
+                        <td><span class="issue-num">#@i.ResponseNumber</span></td>
+                        <td>
+                            <span class="issue-title">@Truncate(i.Title, 55)</span>
+                            @if (!string.IsNullOrEmpty(i.Tags))
+                            {
+                                @foreach (var t in i.Tags.Split(',').Take(2))
+                                { <span class="tag">@t.Trim()</span> }
+                            }
+                        </td>
+                        <td>@Html.Raw(PriorityBadge(i.Priority))</td>
+                        <td>@Html.Raw(StatusBadge(i.Status))</td>
+                        <td><span class="text-sm text-muted">@FormatProcess(i.Process)</span></td>
+                        <td>
+                            <div class="user-chip">
+                                <div class="avatar">@i.SubmittedBy?.FullName.Substring(0,1)</div>
+                                <span class="user-chip-name">@i.SubmittedBy?.FullName.Split(' ')[0]</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm text-muted">@i.ReceivedDate.ToString("MMM dd")</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@functions {
+    string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
+    string FormatProcess(IssueProcess p) => p switch {
+        IssueProcess.TestingAndQA => "Testing & QA", IssueProcess.OperatingMonitoring => "Operating",
+        IssueProcess.TechnicalDocPrep => "Tech Docs", IssueProcess.CrossFunctional => "Cross-Func", _ => p.ToString()
+    };
+    string StatusBadge(IssueStatus s) => s switch {
+        IssueStatus.Open => "<span class='badge badge-open'>Open</span>",
+        IssueStatus.InProgress => "<span class='badge badge-inprogress'>In Progress</span>",
+        IssueStatus.PendingReview => "<span class='badge badge-pending'>Pending</span>",
+        IssueStatus.Resolved => "<span class='badge badge-resolved'>Resolved</span>",
+        IssueStatus.Closed => "<span class='badge badge-closed'>Closed</span>",
+        _ => "<span class='badge badge-rejected'>Rejected</span>"
+    };
+    string PriorityBadge(IssuePriority p) => p switch {
+        IssuePriority.Critical => "<span class='badge badge-critical'>● Critical</span>",
+        IssuePriority.High => "<span class='badge badge-high'>↑ High</span>",
+        IssuePriority.Medium => "<span class='badge badge-medium'>– Medium</span>",
+        IssuePriority.Low => "<span class='badge badge-low'>↓ Low</span>",
+        _ => "<span class='badge badge-minimal'>Minimal</span>"
+    };
+}

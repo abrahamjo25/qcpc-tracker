@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  qcpc:
+    image: abrahamjo24/qcpc-issue:latest
+    network_mode: "host"
+    environment:
+      # Email settings - override these as needed
+      # Use double underscore (__) for nested configuration in environment variables
+      - Email__Enabled=true
+      - Email__Host=SVDRMAILBOX08.ethiopianairlines.com
+      - Email__Port=587
+      - Email__UseSsl=false
+      - Email__UserName=notify-me@ethiopianairlines.com
+      - Email__Password=Qwer@123456789
+      - Email__FromAddress=notify-me@ethiopianairlines.com
+      - Email__FromName=QCPC Issue Tracker
+      - Email__AcceptInvalidCertificates=true
+      # Database connection
+      - ConnectionStrings__DefaultConnection=Server=10.0.227.152,1501;Database=QCPCTracker;User Id=sa;Password=1234@Abcd;Encrypt=False;TrustServerCertificate=True;
+
+# Usage:
+# 1. Run with: docker-compose up
+# Note: network_mode: host allows the container to resolve internal network hostnames
+# and access internal services like your company SMTP server

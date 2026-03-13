@@ -1,0 +1,193 @@
+@model QCPCMvc.ViewModels.IssueListVm
+@using QCPCMvc.Models
+@{ ViewData["Title"] = "Issues"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Issues</h1>
+        <div class="page-subtitle">@Model.TotalCount issue(s) found</div>
+    </div>
+    @if (User.Identity?.IsAuthenticated == false)
+    {
+        <button class="btn btn-primary" data-auth-required="/Issues/Create">
+            <i class="bi bi-plus-lg"></i> Report Issue
+        </button>
+    }
+</div>
+
+@* Filter Bar *@
+<form method="get" action="/Issues">
+    <div class="filter-bar">
+        <div style="position:relative;display:flex;align-items:center">
+            <i class="bi bi-search" style="position:absolute;left:10px;color:var(--tx-3);font-size:13px;pointer-events:none"></i>
+            <input type="text" name="Search" value="@Model.Filter.Search"
+                   class="form-control" style="max-width:280px;padding-left:32px"
+                   placeholder="Semantic search — describe the issue…" />
+        </div>
+
+        <select name="Status" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Status</option>
+            @foreach (IssueStatus s in Enum.GetValues<IssueStatus>())
+            { <option value="@s" selected="@(Model.Filter.Status == s)">@s</option> }
+        </select>
+
+        <select name="Priority" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Priority</option>
+            @foreach (IssuePriority p in Enum.GetValues<IssuePriority>())
+            { <option value="@p" selected="@(Model.Filter.Priority == p)">@p</option> }
+        </select>
+
+        <select name="Process" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Process</option>
+            @foreach (IssueProcess p in Enum.GetValues<IssueProcess>())
+            { <option value="@p" selected="@(Model.Filter.Process == p)">@FormatProcess(p)</option> }
+        </select>
+
+        <select name="Type" class="filter-select" onchange="this.form.submit()">
+            <option value="">Int/Ext</option>
+            <option value="Internal" selected="@(Model.Filter.Type == IssueType.Internal)">Internal</option>
+            <option value="External" selected="@(Model.Filter.Type == IssueType.External)">External</option>
+        </select>
+
+        <button type="submit" class="btn btn-ghost btn-sm"><i class="bi bi-search"></i> Search</button>
+        @if (Model.Filter.Search != null || Model.Filter.Status != null || Model.Filter.Priority != null || Model.Filter.Process != null)
+        {
+            <a href="/Issues" class="btn btn-ghost btn-sm"><i class="bi bi-x"></i> Clear</a>
+        }
+    </div>
+</form>
+
+@* Vector search result indicator *@
+@if (!string.IsNullOrEmpty(Model.Filter.Search))
+{
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12.5px;color:var(--tx-3)">
+        @if (Model.Filter.VectorSearchActive)
+        {
+            <span style="display:inline-flex;align-items:center;gap:5px;background:rgba(79,124,255,.1);
+                         border:1px solid rgba(79,124,255,.25);color:#7ba6ff;
+                         padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600">
+                <i class="bi bi-stars"></i> Semantic Search
+            </span>
+            <span>@Model.TotalCount result(s) ranked by relevance for "@Model.Filter.Search"</span>
+        }
+        else
+        {
+            <span style="display:inline-flex;align-items:center;gap:5px;background:var(--bg-3);
+                         border:1px solid var(--border);color:var(--tx-3);
+                         padding:3px 10px;border-radius:20px;font-size:11.5px">
+                <i class="bi bi-search"></i> Keyword Search
+            </span>
+            <span>@Model.TotalCount result(s) for "@Model.Filter.Search"</span>
+        }
+    </div>
+}
+
+@if (!Model.Issues.Any())
+{
+    <div class="empty-state">
+        <i class="bi bi-inbox"></i>
+        <h3>No issues found</h3>
+        <p>Try adjusting your filters or <a href="/Issues/Create">report a new issue</a>.</p>
+    </div>
+}
+else
+{
+    <div class="card" style="overflow-x:auto">
+        <table class="issue-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Process</th>
+                    <th>Team</th>
+                    <th>Assignee</th>
+                    <th>Ans</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var issue in Model.Issues)
+                {
+                    var overdue = issue.PromisedDate < DateTime.UtcNow
+                                  && issue.Status != IssueStatus.Resolved
+                                  && issue.Status != IssueStatus.Closed;
+                    <tr onclick="location.href='/Issues/Detail/@issue.Id'">
+                        <td><span class="issue-num">#@issue.ResponseNumber</span></td>
+                        <td style="max-width:320px">
+                            <span class="issue-title">@Truncate(issue.Title, 60)</span>
+                            @if (!string.IsNullOrEmpty(issue.Tags))
+                            {
+                                <div>
+                                    @foreach (var t in issue.Tags.Split(',').Take(3))
+                                    { <span class="tag">@t.Trim()</span> }
+                                </div>
+                            }
+                        </td>
+                        <td>@Html.Raw(PriorityBadge(issue.Priority))</td>
+                        <td>@Html.Raw(StatusBadge(issue.Status))</td>
+                        <td><span class="text-sm text-muted">@FormatProcess(issue.Process)</span></td>
+                        <td><span class="text-sm text-muted">@issue.ResponsibleTeam</span></td>
+                        <td>
+                            @if (issue.AssignedTo != null)
+                            {
+                                <div class="user-chip">
+                                    <div class="avatar">@issue.AssignedTo.FullName.Substring(0,1)</div>
+                                    <span class="user-chip-name">@issue.AssignedTo.FullName.Split(' ')[0]</span>
+                                </div>
+                            }
+                            else { <span class="text-muted text-xs">—</span> }
+                        </td>
+                        <td>
+                            <span class="answer-chip @(issue.Answers.Any(a => a.IsAccepted) ? "has-answer" : "")">
+                                <i class="bi bi-chat-square"></i> @issue.Answers.Count
+                            </span>
+                        </td>
+                        <td>
+                            <span class="text-sm @(overdue ? "overdue" : "text-muted")">
+                                @issue.ReceivedDate.ToString("MMM dd")
+                                @if (overdue) { <i class="bi bi-clock-history" title="Overdue"></i> }
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @* Pagination *@
+    @if (Model.TotalPages > 1)
+    {
+        <div class="pagination">
+            @for (int p = 1; p <= Model.TotalPages; p++)
+            {
+                var q = $"/Issues?Page={p}&Search={Model.Filter.Search}&Status={Model.Filter.Status}&Priority={Model.Filter.Priority}&Process={Model.Filter.Process}";
+                <a href="@q" class="page-btn @(Model.Filter.Page == p ? "active" : "")">@p</a>
+            }
+        </div>
+    }
+}
+
+@functions {
+    string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
+    string FormatProcess(IssueProcess p) => p switch {
+        IssueProcess.TestingAndQA => "Testing & QA", IssueProcess.OperatingMonitoring => "Operating",
+        IssueProcess.TechnicalDocPrep => "Tech Docs", IssueProcess.CrossFunctional => "Cross-Func", _ => p.ToString()
+    };
+    string StatusBadge(IssueStatus s) => s switch {
+        IssueStatus.Open => "<span class='badge badge-open'>Open</span>",
+        IssueStatus.InProgress => "<span class='badge badge-inprogress'>In Progress</span>",
+        IssueStatus.PendingReview => "<span class='badge badge-pending'>Pending</span>",
+        IssueStatus.Resolved => "<span class='badge badge-resolved'>Resolved</span>",
+        IssueStatus.Closed => "<span class='badge badge-closed'>Closed</span>",
+        _ => "<span class='badge badge-rejected'>Rejected</span>"
+    };
+    string PriorityBadge(IssuePriority p) => p switch {
+        IssuePriority.Critical => "<span class='badge badge-critical'>● Critical</span>",
+        IssuePriority.High => "<span class='badge badge-high'>↑ High</span>",
+        IssuePriority.Medium => "<span class='badge badge-medium'>– Medium</span>",
+        IssuePriority.Low => "<span class='badge badge-low'>↓ Low</span>",
+        _ => "<span class='badge badge-minimal'>Minimal</span>"
+    };
+}

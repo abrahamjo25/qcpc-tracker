@@ -1,0 +1,67 @@
+@model QCPCMvc.Models.IssueComment
+@using System.Security.Claims
+@using System.Text.RegularExpressions
+@using System.Net
+
+<div class="comment-block" id="comment-@Model.Id">
+    <div class="comment-meta">
+        <div class="avatar">@(Model.Author?.FullName?.Substring(0,1) ?? "?")</div>
+        <span class="comment-author">@Model.Author?.FullName</span>
+        <span class="comment-time">@TimeAgo(Model.CreatedAt)</span>
+    </div>
+    <div class="comment-body mt-4">@Html.Raw(RenderMentions(Model.Body))</div>
+    @if (User.Identity?.IsAuthenticated == true)
+    {
+        <div style="margin-top:4px">
+            <button type="button" class="btn-reply-toggle"
+                    data-issue="@(Model.IssueId ?? 0)"
+                    data-answer="@(Model.AnswerId?.ToString() ?? "")"
+                    data-parent="@Model.Id"
+                    style="background:none;border:none;font-size:11.5px;color:var(--tx-3);cursor:pointer;padding:0">
+                <i class="bi bi-reply"></i> Reply
+            </button>
+            <div class="reply-form" style="display:none;margin-top:8px">
+                <form method="post" action="/Issues/PostComment">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="issueId"  value="@(Model.IssueId ?? 0)" />
+                    <input type="hidden" name="answerId" value="@(Model.AnswerId?.ToString() ?? "")" />
+                    <input type="hidden" name="parentId" value="@Model.Id" />
+                    <div style="display:flex;gap:8px;position:relative">
+                        <input type="text" name="body" class="form-control mention-input"
+                               placeholder="Write a reply… (use @@name)"
+                               style="font-size:12.5px;padding:6px 10px"
+                               autocomplete="off" />
+                        <button type="submit" class="btn btn-ghost btn-xs">Reply</button>
+                        <button type="button" class="btn btn-ghost btn-xs btn-cancel-reply">Cancel</button>
+                        <div class="mention-dropdown" style="display:none"></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+
+@functions {
+    string TimeAgo(DateTime dt) {
+        var d = DateTime.UtcNow - dt;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours   < 1) return $"{(int)d.TotalMinutes}m";
+        if (d.TotalDays    < 1) return $"{(int)d.TotalHours}h";
+        return dt.ToString("MMM dd");
+    }
+
+    // Strip any accidentally-stored HTML, then HtmlEncode, then highlight @mentions
+    string RenderMentions(string? text) {
+        if (string.IsNullOrEmpty(text)) return "";
+        // Remove any HTML tags that were accidentally stored in DB
+        var clean = Regex.Replace(text, @"<[^>]+>", "");
+        // HTML-encode the clean plain text
+        var encoded = WebUtility.HtmlEncode(clean);
+        // Replace newlines
+        encoded = encoded.Replace("\n", "<br>");
+        // Highlight @Handle or @First.Last
+        return Regex.Replace(encoded,
+            @"@([\w][\w.]{0,49})",
+            m => $"<span class='mention-highlight'>@{WebUtility.HtmlEncode(m.Groups[1].Value)}</span>");
+    }
+}

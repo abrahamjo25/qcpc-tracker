@@ -1,0 +1,109 @@
+@model QCPCMvc.ViewModels.ManageProfileVm
+@{
+    Layout = null;
+    var departments = ViewBag.Departments as List<QCPCMvc.Models.Department> ?? new();
+}
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0"/><link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+<title>Manage Profile — QCPC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+<link rel="stylesheet" href="~/css/site.css"/>
+<script>(function(){var t=localStorage.getItem('qcpc-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+<div class="auth-shell">
+    <div class="auth-card" style="max-width:520px">
+        <button type="button" id="themeToggle" class="theme-toggle" style="position:absolute;top:14px;right:14px" title="Toggle theme">
+            <i class="bi bi-sun" id="themeIcon"></i>
+        </button>
+        <div class="auth-logo">
+            <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+                <path d="M11 2L3 6V11C3 15.418 6.582 19.418 11 20C15.418 19.418 19 15.418 19 11V6L11 2Z" fill="currentColor"/>
+                <path d="M8 11L10 13L14 9" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h1 class="auth-title">Manage Profile</h1>
+        <p class="auth-subtitle">Update your account information</p>
+
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert-success">
+                <i class="bi bi-check-circle"></i> @TempData["Success"]
+            </div>
+        }
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert-error">
+                @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                { <div>@e.ErrorMessage</div> }
+            </div>
+        }
+
+        <form asp-action="Manage" method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label>Full Name</label>
+                <div class="input-icon-wrap">
+                    <i class="bi bi-person"></i>
+                    <input asp-for="FullName" class="form-control" placeholder="Your full name" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Email Address</label>
+                <div class="input-icon-wrap">
+                    <i class="bi bi-envelope"></i>
+                    <input asp-for="Email" class="form-control" readonly style="background:var(--bg-2);cursor:not-allowed" />
+                </div>
+                <small style="color:var(--tx-2);font-size:12px">Email cannot be changed</small>
+            </div>
+            <div class="form-group">
+                <label>Department</label>
+                <div class="input-icon-wrap">
+                    <i class="bi bi-building"></i>
+                    <select asp-for="DepartmentId" class="form-control">
+                        <option value="">-- Select Department --</option>
+                        @foreach (var dept in departments)
+                        {
+                            <option value="@dept.Id">@dept.Name</option>
+                        }
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex;gap:12px;margin-top:24px">
+                <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">
+                    <i class="bi bi-check-lg"></i> Save Changes
+                </button>
+                <a asp-action="ChangePassword" class="btn btn-secondary" style="flex:1;justify-content:center;text-align:center">
+                    <i class="bi bi-key"></i> Change Password
+                </a>
+            </div>
+        </form>
+
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+            <a asp-action="DeleteAccount" class="btn btn-danger" style="width:100%;justify-content:center">
+                <i class="bi bi-trash"></i> Delete Account
+            </a>
+        </div>
+
+        <div class="auth-footer">
+            <a href="/">&larr; Back to Dashboard</a>
+        </div>
+    </div>
+</div>
+<script>
+function applyTheme(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem('qcpc-theme',t);
+    var i=document.getElementById('themeIcon');
+    if(i) i.className=t==='dark'?'bi bi-sun':'bi bi-moon';
+}
+var tb=document.getElementById('themeToggle');
+if(tb){ applyTheme(localStorage.getItem('qcpc-theme')||'light'); tb.onclick=function(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); }; }
+</script>
+</body>
+</html>

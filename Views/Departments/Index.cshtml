@@ -1,0 +1,84 @@
+@model List<QCPCMvc.Models.Department>
+@{ ViewData["Title"] = "Department Management"; }
+
+<div class="page-header">
+    <h1 class="page-title">Department Management</h1>
+    <div class="page-subtitle">Manage departments and their group email addresses</div>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success">@TempData["Success"]</div>}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<div class="card" style="overflow-x:auto">
+    <table class="issue-table">
+        <thead>
+            <tr><th>Department Name</th><th>Group Email</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var d in Model)
+            {
+                <tr>
+                    <td style="vertical-align:middle">@d.Name</td>
+                    <td style="vertical-align:middle">@d.GroupEmail</td>
+                    <td style="vertical-align:middle">
+                        @if (d.IsActive)
+                        {
+                            <span class="badge badge-closed">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-rejected">Inactive</span>
+                        }
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="toggleEdit(@d.Id)">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                    </td>
+                </tr>
+                <tr id="edit-@d.Id" style="display:none;background:var(--bg-2)">
+                    <form method="post" action="/Departments/Edit">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" value="@d.Id" />
+                    <input type="hidden" name="CreatedAt" value="@d.CreatedAt.ToString("o")" />
+                    <td><input type="text" name="Name" class="form-control" value="@d.Name" required /></td>
+                    <td><input type="email" name="GroupEmail" class="form-control" value="@d.GroupEmail" required /></td>
+                    <td>
+                        <select name="IsActive" class="form-control">
+                            <option value="true" selected="@(d.IsActive)">Active</option>
+                            <option value="false" selected="@(!d.IsActive)">Inactive</option>
+                        </select>
+                    </td>
+                    <td style="display:flex;gap:6px">
+                        <button type="submit" class="btn btn-primary btn-xs">
+                            <i class="bi bi-check-lg"></i> Save
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-xs" onclick="toggleEdit(@d.Id)">Cancel</button>
+                    </td>
+                    </form>
+                </tr>
+            }
+            <tr style="background:var(--bg-2)">
+                <form method="post" action="/Departments/Create">
+                    @Html.AntiForgeryToken()
+                    <td><input type="text" name="Name" class="form-control" placeholder="New department name" required /></td>
+                    <td><input type="email" name="GroupEmail" class="form-control" placeholder="group@email.com" required /></td>
+                    <td><span class="badge badge-closed">Active</span><input type="hidden" name="IsActive" value="true" /></td>
+                    <td><button type="submit" class="btn btn-primary btn-xs"><i class="bi bi-plus-lg"></i> Add</button></td>
+                </form>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+function toggleEdit(id) {
+    var row = document.getElementById('edit-' + id);
+    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+}
+</script>

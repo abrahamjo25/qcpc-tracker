@@ -1,0 +1,68 @@
+@model List<QCPCMvc.Models.Notification>
+@using QCPCMvc.Models
+@{ ViewData["Title"] = "Notifications"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Notifications</h1>
+        <div class="page-subtitle">@Model.Count(n => !n.IsRead) unread</div>
+    </div>
+    @if (Model.Any(n => !n.IsRead))
+    {
+        <form method="post" action="/Issues/MarkAllRead">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-ghost btn-sm">
+                <i class="bi bi-check2-all"></i> Mark All Read
+            </button>
+        </form>
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <div class="empty-state">
+        <i class="bi bi-bell-slash"></i>
+        <h3>All caught up!</h3>
+        <p>No notifications yet.</p>
+    </div>
+}
+else
+{
+    <div class="card" style="overflow:hidden">
+        @foreach (var n in Model)
+        {
+            <a href="@(n.Link ?? "#")" class="notif-item @(!n.IsRead ? "unread" : "")">
+                <div class="notif-icon" style="color:@NotifColor(n.Type)">
+                    <i class="bi bi-@NotifIcon(n.Type)"></i>
+                </div>
+                <div style="flex:1">
+                    <div class="notif-title">@n.Title</div>
+                    <div class="notif-msg">@n.Message</div>
+                    <div class="notif-time">@TimeAgo(n.CreatedAt)</div>
+                </div>
+                @if (!n.IsRead) { <div class="notif-dot"></div> }
+            </a>
+        }
+    </div>
+}
+
+@functions {
+    string NotifIcon(NotificationType t) => t switch {
+        NotificationType.NewIssue => "bug", NotificationType.IssueAssigned => "person-check",
+        NotificationType.NewAnswer => "chat-square-text", NotificationType.AnswerAccepted => "check-circle",
+        NotificationType.NewComment => "chat-left", NotificationType.Mentioned => "at",
+        NotificationType.IssueResolved => "check2-circle", _ => "bell"
+    };
+    string NotifColor(NotificationType t) => t switch {
+        NotificationType.Mentioned => "#f87171", NotificationType.AnswerAccepted => "#34d399",
+        NotificationType.IssueAssigned => "#f5a623", NotificationType.NewAnswer => "#a78bfa", _ => "#4f7cff"
+    };
+    string TimeAgo(DateTime dt) {
+        var d = DateTime.UtcNow - dt;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours   < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays    < 1) return $"{(int)d.TotalHours}h ago";
+        if (d.TotalDays    < 30) return $"{(int)d.TotalDays}d ago";
+        return dt.ToString("MMM dd, yyyy");
+    }
+}

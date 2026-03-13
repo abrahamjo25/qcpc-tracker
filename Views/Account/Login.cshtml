@@ -1,0 +1,89 @@
+@model QCPCMvc.ViewModels.LoginVm
+@{ Layout = null; }
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1.0"/><link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+<title>Sign In — QCPC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+<link rel="stylesheet" href="~/css/site.css"/>
+<script>(function(){var t=localStorage.getItem('qcpc-theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+<div class="auth-shell">
+    <div class="auth-card">
+        <button type="button" id="themeToggle" class="theme-toggle" style="position:absolute;top:14px;right:14px" title="Toggle theme">
+            <i class="bi bi-sun" id="themeIcon"></i>
+        </button>
+        <div class="auth-logo">
+            <svg width="26" height="26" viewBox="0 0 22 22" fill="none">
+                <path d="M11 2L3 6V11C3 15.418 6.582 19.418 11 20C15.418 19.418 19 15.418 19 11V6L11 2Z" fill="currentColor"/>
+                <path d="M8 11L10 13L14 9" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </div>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to QCPC Issue Tracker</p>
+
+        @if (!ViewData.ModelState.IsValid)
+        {
+            <div class="alert-error">
+                @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                { <div>@e.ErrorMessage</div> }
+            </div>
+        }
+
+        <form asp-action="Login" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div class="form-group">
+                <label>Email or Username</label>
+                <div class="input-icon-wrap">
+                    <i class="bi bi-envelope"></i>
+                    <input asp-for="Email" type="text" class="form-control"
+                           placeholder="username or email" autocomplete="username" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <div class="input-icon-wrap">
+                    <i class="bi bi-lock"></i>
+                    <input asp-for="Password" type="password" class="form-control"
+                           id="pwdField" placeholder="••••••••" autocomplete="current-password" />
+                </div>
+            </div>
+            <div class="form-group flex-center gap-8">
+                <label class="form-check" style="margin-bottom:0">
+                    <input asp-for="RememberMe" type="checkbox" />
+                    <span style="font-size:13px;color:var(--tx-2)">Remember me for 7 days</span>
+                </label>
+                <a href="/Account/ForgotPassword" style="font-size:13px;color:var(--accent)">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn btn-primary w-full" style="justify-content:center;padding:10px">
+                <i class="bi bi-box-arrow-in-right"></i> Sign In
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            Don't have an account? <a href="/Account/Register">Create one</a>
+        </div>
+    </div>
+</div>
+<script>
+function togglePwd(){
+    var f=document.getElementById('pwdField'),i=document.getElementById('eyeIco');
+    f.type=f.type==='password'?'text':'password';
+    i.className=f.type==='text'?'bi bi-eye-slash':'bi bi-eye';
+}
+function applyTheme(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem('qcpc-theme',t);
+    var i=document.getElementById('themeIcon');
+    if(i) i.className=t==='dark'?'bi bi-sun':'bi bi-moon';
+}
+var tb=document.getElementById('themeToggle');
+if(tb){ applyTheme(localStorage.getItem('qcpc-theme')||'light'); tb.onclick=function(){ applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'); }; }
+</script>
+</body>
+</html>

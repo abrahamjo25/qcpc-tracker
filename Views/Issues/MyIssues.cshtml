@@ -1,0 +1,76 @@
+@model List<QCPCMvc.Models.Issue>
+@using QCPCMvc.Models
+@{ ViewData["Title"] = "My Issues"; var assigned = ViewBag.Assigned as List<Issue> ?? new(); }
+
+<div class="page-header">
+    <h1 class="page-title">My Issues</h1>
+    <a href="/Issues/Create" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Report Issue</a>
+</div>
+
+<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+    <div class="kpi-card" style="--kpi-color:#7ba6ff;cursor:default">
+        <div class="kpi-value">@Model.Count</div>
+        <div class="kpi-label">Submitted</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#a78bfa;cursor:default">
+        <div class="kpi-value">@assigned.Count</div>
+        <div class="kpi-label">Assigned to Me</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#f5a623;cursor:default">
+        <div class="kpi-value">@Model.Count(i => i.Status == IssueStatus.Open)</div>
+        <div class="kpi-label">Open</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:#34d399;cursor:default">
+        <div class="kpi-value">@Model.Count(i => i.Status == IssueStatus.Resolved)</div>
+        <div class="kpi-label">Resolved</div>
+    </div>
+</div>
+
+@IssueTable("Submitted by Me", Model)
+@IssueTable("Assigned to Me", assigned)
+
+@functions {
+    IHtmlContent IssueTable(string title, List<Issue> issues)
+    {
+        if (!issues.Any()) return new HtmlString($@"
+            <div class='card mb-16'>
+                <div class='card-body'>
+                    <div class='form-section-title'>{title}</div>
+                    <p class='text-sm text-muted'>No issues.</p>
+                </div>
+            </div>");
+
+        var rows = string.Join("", issues.Select(i => $@"
+            <tr onclick=""location.href='/Issues/Detail/{i.Id}'"" style='cursor:pointer'>
+                <td><span class='issue-num'>#{i.ResponseNumber}</span></td>
+                <td style='max-width:280px'><span class='issue-title'>{Truncate(i.Title,55)}</span></td>
+                <td>{PriorityBadge(i.Priority)}</td>
+                <td>{StatusBadge(i.Status)}</td>
+                <td><span class='text-sm text-muted'>{i.ReceivedDate:MMM dd, yyyy}</span></td>
+            </tr>"));
+
+        return new HtmlString($@"
+            <div class='card mb-16' style='overflow-x:auto'>
+                <div class='card-body' style='padding-bottom:0'>
+                    <div class='form-section-title'>{title} <span style='font-weight:400;color:var(--tx-3)'>({issues.Count})</span></div>
+                </div>
+                <table class='issue-table'>
+                    <thead><tr><th>#</th><th>Title</th><th>Priority</th><th>Status</th><th>Date</th></tr></thead>
+                    <tbody>{rows}</tbody>
+                </table>
+            </div>");
+    }
+    string Truncate(string s, int n) => s.Length <= n ? s : s[..n] + "…";
+    string StatusBadge(IssueStatus s) => s switch {
+        IssueStatus.Open => "<span class='badge badge-open'>Open</span>",
+        IssueStatus.InProgress => "<span class='badge badge-inprogress'>In Progress</span>",
+        IssueStatus.Resolved => "<span class='badge badge-resolved'>Resolved</span>",
+        _ => $"<span class='badge badge-closed'>{s}</span>"
+    };
+    string PriorityBadge(IssuePriority p) => p switch {
+        IssuePriority.Critical => "<span class='badge badge-critical'>● Critical</span>",
+        IssuePriority.High => "<span class='badge badge-high'>↑ High</span>",
+        IssuePriority.Medium => "<span class='badge badge-medium'>– Medium</span>",
+        _ => $"<span class='badge badge-low'>{p}</span>"
+    };
+}

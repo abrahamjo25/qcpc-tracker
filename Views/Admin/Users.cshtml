@@ -1,0 +1,42 @@
+@model List<QCPCMvc.Models.ApplicationUser>
+@{ ViewData["Title"] = "User Management"; var roles = ViewBag.Roles as Dictionary<string,string>; }
+
+<div class="page-header">
+    <h1 class="page-title">User Management</h1>
+    <div class="page-subtitle">Manage roles and access for all team members</div>
+</div>
+
+<div class="card" style="overflow-x:auto">
+    <table class="issue-table">
+        <thead>
+            <tr><th>User</th><th>Email</th><th>Department</th><th>Role</th><th>Joined</th><th>Change Role</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var u in Model)
+            {
+                var role = roles?.GetValueOrDefault(u.Id, "Developer") ?? "Developer";
+                <tr>
+                    <td><div class="user-chip">
+                        <div class="avatar">@u.FullName.Substring(0,1)</div>
+                        <span style="font-weight:600;font-size:13px">@u.FullName</span>
+                    </div></td>
+                    <td><span class="text-sm text-muted">@u.Email</span></td>
+                    <td><span class="text-sm text-muted">@u.Department</span></td>
+                    <td><span class="badge badge-closed">@role</span></td>
+                    <td><span class="text-sm text-muted">@u.CreatedAt.ToString("MMM yyyy")</span></td>
+                    <td>
+                        <form method="post" action="/Admin/ChangeRole" style="display:flex;gap:6px">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="userId" value="@u.Id" />
+                            <select name="role" class="role-select">
+                                @foreach (var r in new[]{"Admin","QualityManager","TeamLead","Developer","Viewer"})
+                                { <option value="@r" selected="@(role == r)">@r</option> }
+                            </select>
+                            <button type="submit" class="btn btn-ghost btn-xs">Save</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

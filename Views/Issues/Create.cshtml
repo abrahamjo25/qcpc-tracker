@@ -1,0 +1,142 @@
+@model QCPCMvc.ViewModels.IssueFormVm
+@using QCPCMvc.Models
+@{ var isEdit = Model.Id > 0; ViewData["Title"] = isEdit ? "Edit Issue" : "Report Issue"; }
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">@(isEdit ? "Edit Issue" : "Report New Issue")</h1>
+        <div class="page-subtitle">@(isEdit ? $"Editing Issue #{Model.Id}" : "Document a quality control issue for tracking and resolution")</div>
+    </div>
+    <a href="@(isEdit ? $"/Issues/Detail/{Model.Id}" : "/Issues")" class="btn btn-ghost">
+        <i class="bi bi-x"></i> Cancel
+    </a>
+</div>
+
+<form asp-action="@(isEdit ? "Edit" : "Create")" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-file-text"></i> Issue Details</div>
+
+        <div class="form-group">
+            <label>Issue Title <span style="color:#f87171">*</span></label>
+            <input asp-for="Title" class="form-control" placeholder="Brief, clear description of the issue" />
+            <span asp-validation-for="Title" class="field-error"></span>
+        </div>
+
+        <div class="form-group">
+            <label>Full Description <span style="color:#f87171">*</span></label>
+            <small style="display:block;color:var(--tx-3);margin-bottom:6px;font-size:12px">
+                Use @@username to mention team members. Describe the problem, steps to reproduce, impact.
+            </small>
+            <textarea asp-for="Description" class="form-control" rows="6"
+                      placeholder="Detailed description of the issue…"></textarea>
+            <span asp-validation-for="Description" class="field-error"></span>
+        </div>
+
+        <div class="form-group">
+            <label>Corrective Action</label>
+            <textarea asp-for="CorrectiveAction" class="form-control" rows="3"
+                      placeholder="What action was taken or should be taken to resolve this issue?"></textarea>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <div class="form-section-title"><i class="bi bi-tags"></i> Classification</div>
+        <div class="form-grid-3">
+            <div class="form-group">
+                <label>Type</label>
+                <select asp-for="Type" class="form-control">
+                    @foreach (IssueType t in Enum.GetValues<IssueType>())
+                    { <option value="@t">@t</option> }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Priority <span style="color:#f87171">*</span></label>
+                <select asp-for="Priority" class="form-control">
+                    @foreach (IssuePriority p in Enum.GetValues<IssuePriority>())
+                    { <option value="@p">@((int)p). @p</option> }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Process</label>
+                <select asp-for="Process" class="form-control">
+                    @foreach (IssueProcess p in Enum.GetValues<IssueProcess>())
+                    { <option value="@p">@FormatProcess(p)</option> }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Responsible Team</label>
+                <select asp-for="ResponsibleTeam" class="form-control">
+                    <option value="">Select team…</option>
+                    <option>QCPC</option><option>TPM</option>
+                    <option>RCCA</option><option>5S+1</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Q. Group</label>
+                <select asp-for="QGroup" class="form-control">
+                    @foreach (QualityGroup g in Enum.GetValues<QualityGroup>())
+                    { <option value="@g">Group @((int)g)</option> }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select asp-for="Status" class="form-control">
+                    @foreach (IssueStatus s in Enum.GetValues<IssueStatus>())
+                    { <option value="@s">@s</option> }
+                </select>
+            </div>
+        </div>
+
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label>Assign To</label>
+                <select asp-for="AssignedToId" class="form-control">
+                    <option value="">Unassigned</option>
+                    @foreach (var u in ViewBag.Users as List<QCPCMvc.Models.ApplicationUser> ?? new())
+                    { <option value="@u.Id">@u.FullName — @u.Department</option> }
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Promised Date</label>
+                <input asp-for="PromisedDate" type="date" class="form-control" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Tags <span class="text-muted">(comma-separated)</span></label>
+            <input asp-for="Tags" class="form-control" placeholder="mulesoft, database, api, network…" />
+        </div>
+
+        <div style="display:flex;gap:24px;margin-top:4px">
+            <label class="form-check">
+                <input asp-for="Admitted" type="checkbox" />
+                <span>Admitted</span>
+            </label>
+            <label class="form-check">
+                <input asp-for="Resolved" type="checkbox" />
+                <span>Resolved</span>
+            </label>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-@(isEdit ? "save" : "plus-circle")"></i>
+            @(isEdit ? "Save Changes" : "Submit Issue")
+        </button>
+        <a href="@(isEdit ? $"/Issues/Detail/{Model.Id}" : "/Issues")" class="btn btn-ghost">Cancel</a>
+    </div>
+</form>
+
+@functions {
+    string FormatProcess(IssueProcess p) => p switch {
+        IssueProcess.TestingAndQA => "Testing & QA",
+        IssueProcess.OperatingMonitoring => "Operating & Monitoring",
+        IssueProcess.TechnicalDocPrep => "Technical Doc Preparation",
+        IssueProcess.CrossFunctional => "Cross Functional",
+        _ => p.ToString()
+    };
+}
