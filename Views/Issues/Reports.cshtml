@@ -13,10 +13,54 @@
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
 
+    @* TurnBacks Export *@
+    <div class="card">
+        <div class="card-body">
+            <div class="form-section-title"><i class="bi bi-arrow-counterclockwise"></i> TurnBacks Report</div>
+            <p class="text-sm" style="color:var(--tx-2);margin-bottom:16px;line-height:1.7">
+                Export issues in TurnBacks format — detailed record with all statuses and Q.Group tracking.
+            </p>
+            <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12.5px;color:var(--tx-2)">
+                <div><i class="bi bi-check2" style="color:#34d399;margin-right:6px"></i> Internal/External, Response No., Dates</div>
+                <div><i class="bi bi-check2" style="color:#34d399;margin-right:6px"></i> Opportunity, Priority, Process, Responsible</div>
+                <div><i class="bi bi-check2" style="color:#34d399;margin-right:6px"></i> Corrective Action, Promised/Completed Dates</div>
+                <div><i class="bi bi-check2" style="color:#34d399;margin-right:6px"></i> Submitted By, Admitted, Resolved, Q.Group</div>
+            </div>
+            <a href="/Issues/ExportTurnBacks" class="btn btn-primary w-full" style="justify-content:center;margin-bottom:12px">
+                <i class="bi bi-download"></i> Download All TurnBacks (.xlsx)
+            </a>
+            @if (months.Any())
+            {
+                <div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;padding-right:4px">
+                    @foreach (var m in months)
+                    {
+                        <a href="/Issues/ExportTurnBacks?year=@m.Year&month=@m.Month"
+                           class="month-export-row">
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <i class="bi bi-calendar3" style="color:var(--accent);font-size:15px"></i>
+                                <div>
+                                    <div style="font-size:13.5px;font-weight:600;color:var(--tx-1)">@m.Label</div>
+                                    <div style="font-size:11.5px;color:var(--tx-3)">@m.Count issue(s)</div>
+                                </div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px;color:var(--accent);font-size:12.5px;font-weight:600">
+                                <i class="bi bi-download"></i> .xlsx
+                            </div>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;margin-top:18px">
+
     @* Full Export *@
     <div class="card">
         <div class="card-body">
-            <div class="form-section-title"><i class="bi bi-file-earmark-spreadsheet"></i> Full Export</div>
+            <div class="form-section-title"><i class="bi bi-file-earmark-spreadsheet"></i> Full Summary</div>
             <p class="text-sm" style="color:var(--tx-2);margin-bottom:16px;line-height:1.7">
                 Export all <strong>@ViewBag.TotalCount</strong> issues with a Summary sheet,
                 detailed Issues sheet with colour-coded rows, and a Monthly Breakdown sheet.

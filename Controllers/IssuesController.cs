@@ -349,6 +349,96 @@ public class IssuesController : Controller
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    // ── TurnBacks Excel Export ──────────────────────────────────────────────────
+    [Authorize]
+    public async Task<IActionResult> ExportTurnBacks(int? year, int? month)
+    {
+        var allIssues = await _svc.GetAllForExportAsync();
+
+        if (year.HasValue && month.HasValue)
+            allIssues = allIssues
+                .Where(i => i.ReceivedDate.Year == year && i.ReceivedDate.Month == month)
+                .ToList();
+
+        using var wb = new XLWorkbook();
+
+        var ws = wb.Worksheets.Add("List of TurnBacks");
+        
+        // Headers matching the requested format
+        var headers = new[] {
+            "Internal/External",
+            "Response No.",
+            "Received Date",
+            "Date accepted",
+            "Opportunity",
+            "Priority",
+            "Process",
+            "Responsible",
+            "Corrective Action",
+            "Promised Date",
+            "Date completed",
+            "Submitted By",
+            "Admitted",
+            "Resolved",
+            "Q.Group"
+        };
+        
+        for (int c = 0; c < headers.Length; c++)
+        {
+            var cell = ws.Cell(1, c + 1);
+            cell.Value = headers[c];
+            cell.Style.Font.Bold = true;
+            cell.Style.Fill.BackgroundColor = XLColor.FromHtml("#1a3a5c");
+            cell.Style.Font.FontColor = XLColor.White;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        }
+
+        int r = 2;
+        foreach (var i in allIssues.OrderBy(i => i.ReceivedDate))
+        {
+            ws.Cell(r, 1).Value = i.Type.ToString();
+            ws.Cell(r, 2).Value = i.ResponseNumber;
+            ws.Cell(r, 3).Value = i.ReceivedDate.ToString("yyyy-MM-dd");
+            ws.Cell(r, 4).Value = i.AcceptedDate.ToString("yyyy-MM-dd");
+            ws.Cell(r, 5).Value = i.Title;
+            ws.Cell(r, 6).Value = (int)i.Priority;
+            ws.Cell(r, 7).Value = (int)i.Process;
+            ws.Cell(r, 8).Value = i.ResponsibleTeam ?? "";
+            ws.Cell(r, 9).Value = i.CorrectiveAction ?? "";
+            ws.Cell(r, 10).Value = i.PromisedDate?.ToString("yyyy-MM-dd") ?? "";
+            ws.Cell(r, 11).Value = i.CompletedDate?.ToString("yyyy-MM-dd") ?? "";
+            ws.Cell(r, 12).Value = i.SubmittedBy?.FullName ?? "";
+            ws.Cell(r, 13).Value = i.Admitted ? "ü" : "No";
+            ws.Cell(r, 14).Value = i.Resolved ? "Yes" : "No";
+            ws.Cell(r, 15).Value = (int)i.QGroup;
+
+            // Apply row styling based on priority
+            ws.Row(r).Style.Fill.BackgroundColor = i.Priority switch
+            {
+                IssuePriority.Critical => XLColor.FromHtml("#fde8e8"),
+                IssuePriority.High => XLColor.FromHtml("#fef3e0"),
+                IssuePriority.Medium => XLColor.FromHtml("#fefce8"),
+                IssuePriority.Low => XLColor.FromHtml("#ecfdf5"),
+                _ => r % 2 == 0 ? XLColor.FromHtml("#f9fafb") : XLColor.White
+            };
+            r++;
+        }
+
+        ws.Columns().AdjustToContents();
+        ws.Column(5).Width = 50; // Opportunity column
+        ws.Column(9).Width = 50; // Corrective Action column
+        ws.SheetView.FreezeRows(1);
+        ws.RangeUsed()!.SetAutoFilter();
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        var fileName = year.HasValue
+            ? $"TurnBacks_Report_{year:D4}-{month:D2}.xlsx"
+            : $"TurnBacks_Report_All_{DateTime.Now:yyyyMMdd}.xlsx";
+        return File(ms.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
     [Authorize]
     public async Task<IActionResult> Reports()
     {
