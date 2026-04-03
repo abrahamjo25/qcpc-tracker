@@ -398,15 +398,15 @@ public class IssuesController : Controller
         {
             ws.Cell(r, 1).Value = i.Type.ToString();
             ws.Cell(r, 2).Value = i.ResponseNumber;
-            ws.Cell(r, 3).Value = i.ReceivedDate.ToString("yyyy-MM-dd");
-            ws.Cell(r, 4).Value = i.AcceptedDate.ToString("yyyy-MM-dd");
+            ws.Cell(r, 3).Value = i.ReceivedDate.ToString("MM/dd/yyyy");
+            ws.Cell(r, 4).Value = i.AcceptedDate.ToString("MM/dd/yyyy");
             ws.Cell(r, 5).Value = i.Title;
             ws.Cell(r, 6).Value = (int)i.Priority;
             ws.Cell(r, 7).Value = (int)i.Process;
             ws.Cell(r, 8).Value = i.ResponsibleTeam ?? "";
             ws.Cell(r, 9).Value = i.CorrectiveAction ?? "";
-            ws.Cell(r, 10).Value = i.PromisedDate?.ToString("yyyy-MM-dd") ?? "";
-            ws.Cell(r, 11).Value = i.CompletedDate?.ToString("yyyy-MM-dd") ?? "";
+            ws.Cell(r, 10).Value = i.PromisedDate?.ToString("MM/dd/yyyy") ?? "";
+            ws.Cell(r, 11).Value = i.CompletedDate?.ToString("MM/dd/yyyy") ?? "";
             ws.Cell(r, 12).Value = i.SubmittedBy?.FullName ?? "";
             ws.Cell(r, 13).Value = i.Admitted ? "ü" : "No";
             ws.Cell(r, 14).Value = i.Resolved ? "Yes" : "No";
