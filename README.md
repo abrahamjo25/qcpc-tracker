@@ -144,6 +144,6 @@ Data/
 ## Push to docker hub registry
 
 ```bash
-docker build -t abrahamjo24/qcpc-issue:latest .
+docker run --network=host abrahamjo24/qcpc-issue:latest .
 docker push abrahamjo24/qcpc-issue:latest
 ```
