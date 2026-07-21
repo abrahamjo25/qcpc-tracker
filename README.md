@@ -141,3 +141,9 @@ Data/
   AppDbContext.cs
   DbSeeder.cs             — Seeds roles, 9 users, 12 real issues
 ```
+## Push to docker hub registry
+
+```bash
+docker build -t abrahamjo24/qcpc-issue:latest .
+docker push abrahamjo24/qcpc-issue:latest
+```
